@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A Map of the Unseen</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:          #07070f;
+      --bg-card:     rgba(255,255,255,0.030);
+      --bg-card-h:   rgba(255,255,255,0.055);
+      --text:        #ddd5c4;
+      --text-dim:    #8a7f6e;
+      --text-faint:  rgba(221,213,196,0.35);
+      --gold:        #c9aa72;
+      --gold-glow:   rgba(201,170,114,0.22);
+      --gold-dim:    rgba(201,170,114,0.12);
+      --teal:        #7ec6d4;
+      --teal-glow:   rgba(126,198,212,0.18);
+      --line:        rgba(201,170,114,0.18);
+      --dot:         #c9aa72;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Crimson Pro', Georgia, serif;
+      font-weight: 300;
+      font-size: 18px;
+      line-height: 1.75;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* ─── Custom Cursor ─── */
+    #cursor {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--gold);
+      mix-blend-mode: screen;
+      transform: translate(-50%, -50%);
+      transition: transform 0.08s ease, opacity 0.2s ease;
+      opacity: 0.85;
+    }
+    #cursor-ring {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9998;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(201,170,114,0.35);
+      transform: translate(-50%, -50%);
+      transition: all 0.18s ease;
+    }
+
+    /* ─── Starfield Canvas ─── */
+    #starfield {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ─── Nebula Overlay ─── */
+    .nebula {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% 30%, rgba(126,198,212,0.04) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 70%, rgba(201,170,114,0.05) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 60% at 55% 50%, rgba(90,60,130,0.06) 0%, transparent 70%);
+    }
+
+    /* ─── Scroll Reveal ─── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(36px);
+      transition: opacity 0.9s cubic-bezier(0.22,1,0.36,1),
+                  transform 0.9s cubic-bezier(0.22,1,0.36,1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.35s; }
+    .reveal-delay-4 { transition-delay: 0.5s; }
+
+    /* ─── Layout ─── */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    section { position: relative; z-index: 1; }
+
+    /* ─── Hero ─── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 80px 32px;
+      position: relative;
+    }
+
+    .hero-eyebrow {
+      font-family: 'Crimson Pro', serif;
+      font-size: 12px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--gold);
+      opacity: 0;
+      animation: fadeUp 1.2s cubic-bezier(0.22,1,0.36,1) 0.3s forwards;
+    }
+
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: clamp(3.4rem, 8vw, 7rem);
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      margin: 20px 0 32px;
+      opacity: 0;
+      animation: fadeUp 1.4s cubic-bezier(0.22,1,0.36,1) 0.55s forwards;
+    }
+    .hero-title em {
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    .hero-subtitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-style: italic;
+      font-size: clamp(1.2rem, 2.5vw, 1.55rem);
+      color: var(--text-dim);
+      max-width: 560px;
+      line-height: 1.6;
+      opacity: 0;
+      animation: fadeUp 1.4s cubic-bezier(0.22,1,0.36,1) 0.85s forwards;
+    }
+
+    .hero-line {
+      width: 1px;
+      height: 80px;
+      background: linear-gradient(to bottom, var(--gold), transparent);
+      margin: 60px auto 0;
+      opacity: 0;
+      animation: fadeIn 1.5s ease 1.4s forwards;
+    }
+
+    .hero-scroll-label {
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 12px;
+      opacity: 0;
+      animation: fadeIn 1.5s ease 1.6s forwards;
+    }
+
+    /* ─── Intro Section ─── */
+    #intro {
+      padding: 120px 0;
+    }
+
+    .intro-rule {
+      width: 44px;
+      height: 1px;
+      background: var(--gold);
+      margin-bottom: 40px;
+    }
+
+    .intro-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: clamp(1.35rem, 2.8vw, 1.75rem);
+      line-height: 1.65;
+      color: var(--text);
+    }
+
+    .intro-text p { margin-bottom: 1.4em; }
+    .intro-text p:last-child { margin-bottom: 0; }
+
+    .intro-text em {
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    /* ─── Section Label ─── */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 70px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .section-label::before {
+      content: '';
+      display: block;
+      width: 28px;
+      height: 1px;
+      background: var(--gold);
+      flex-shrink: 0;
+    }
+
+    /* ─── Timeline ─── */
+    #timeline {
+      padding: 60px 0 140px;
+    }
+
+    .timeline-track {
+      position: relative;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* The vertical spine */
+    .timeline-track::before {
+      content: '';
+      position: absolute;
+      left: calc(50% - 0.5px);
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: linear-gradient(
+        to bottom,
+        transparent,
+        rgba(201,170,114,0.4) 8%,
+        rgba(126,198,212,0.3) 50%,
+        rgba(201,170,114,0.4) 92%,
+        transparent
+      );
+    }
+
+    .event {
+      display: grid;
+      grid-template-columns: 1fr 56px 1fr;
+      gap: 0;
+      margin-bottom: 64px;
+      position: relative;
+      align-items: start;
+    }
+
+    /* Dot on the spine */
+    .event-dot {
+      grid-column: 2;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 22px;
+      position: relative;
+      z-index: 2;
+    }
+    .event-dot span {
+      display: block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 1.5px solid var(--gold);
+      box-shadow: 0 0 14px var(--gold-glow), 0 0 28px rgba(201,170,114,0.1);
+      transition: box-shadow 0.4s ease, background 0.3s ease;
+    }
+
+    .event:hover .event-dot span {
+      background: var(--gold);
+      box-shadow: 0 0 20px var(--gold), 0 0 40px var(--gold-glow);
+    }
+
+    /* Card — left side (odd) */
+    .event:nth-child(odd) .event-card {
+      grid-column: 1;
+      grid-row: 1;
+      text-align: right;
+      padding: 0 36px 0 0;
+    }
+    .event:nth-child(odd) .event-spacer {
+      grid-column: 3;
+      grid-row: 1;
+    }
+    .event:nth-child(odd) .event-dot {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    /* Card — right side (even) */
+    .event:nth-child(even) .event-spacer {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .event:nth-child(even) .event-card {
+      grid-column: 3;
+      grid-row: 1;
+      text-align: left;
+      padding: 0 0 0 36px;
+    }
+    .event:nth-child(even) .event-dot {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .event-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.045);
+      border-radius: 2px;
+      padding: 28px 32px !important;
+      cursor: pointer;
+      transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+      position: relative;
+    }
+
+    .event-card:hover {
+      background: var(--bg-card-h);
+      border-color: rgba(201,170,114,0.18);
+      box-shadow: 0 0 40px rgba(201,170,114,0.06);
+    }
+
+    .event-card.open {
+      background: rgba(255,255,255,0.042);
+      border-color: rgba(201,170,114,0.22);
+      box-shadow: 0 0 50px rgba(201,170,114,0.08);
+    }
+
+    .event-year {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.82rem;
+      font-weight: 400;
+      letter-spacing: 0.16em;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+
+    .event-symbol {
+      font-size: 1.6rem;
+      color: var(--text-faint);
+      display: block;
+      margin-bottom: 10px;
+      transition: color 0.3s ease;
+      line-height: 1;
+    }
+    .event-card:hover .event-symbol,
+    .event-card.open .event-symbol { color: var(--gold); }
+
+    .event-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.15rem, 2.2vw, 1.35rem);
+      font-weight: 400;
+      color: var(--text);
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    .event-summary {
+      font-size: 0.92rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+    }
+    .event-summary em { font-style: italic; color: var(--text); }
+
+    .event-mood {
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 14px;
+      display: block;
+    }
+
+    .event-reflection {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.6s cubic-bezier(0.22,1,0.36,1), opacity 0.5s ease, margin 0.4s ease;
+      opacity: 0;
+      margin-top: 0;
+    }
+    .event-card.open .event-reflection {
+      max-height: 300px;
+      opacity: 1;
+      margin-top: 16px;
+    }
+
+    .event-reflection-inner {
+      border-top: 1px solid rgba(201,170,114,0.12);
+      padding-top: 16px;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 0.95rem;
+      line-height: 1.75;
+      color: rgba(221,213,196,0.7);
+    }
+
+    .expand-hint {
+      display: inline-block;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-top: 14px;
+      transition: color 0.3s;
+    }
+    .event-card.open .expand-hint { color: var(--gold); }
+
+    /* ─── Closing Section ─── */
+    #closing {
+      padding: 80px 0 120px;
+    }
+
+    .closing-quote {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: clamp(1.3rem, 2.6vw, 1.65rem);
+      line-height: 1.7;
+      color: var(--text);
+      max-width: 680px;
+    }
+    .closing-quote p { margin-bottom: 1.3em; }
+    .closing-quote p:last-child { margin-bottom: 0; }
+    .closing-quote em { font-style: italic; color: var(--gold); }
+
+    .closing-sigil {
+      font-size: 2.4rem;
+      color: var(--text-faint);
+      display: block;
+      margin: 56px 0 40px;
+      letter-spacing: 0.5em;
+    }
+
+    /* ─── Compatibility Section ─── */
+    #resonance {
+      padding: 60px 0 160px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .resonance-heading {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      line-height: 1.3;
+      color: var(--text);
+      margin-bottom: 32px;
+    }
+
+    .resonance-text {
+      font-family: 'Crimson Pro', serif;
+      font-size: clamp(1rem, 1.8vw, 1.15rem);
+      line-height: 1.8;
+      color: var(--text-dim);
+      max-width: 580px;
+    }
+    .resonance-text p { margin-bottom: 1.2em; }
+    .resonance-text em { font-style: italic; color: var(--text); }
+    .resonance-text strong { font-weight: 400; color: var(--gold); }
+
+    /* Footer */
+    .site-footer {
+      text-align: center;
+      padding: 40px 0 60px;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ─── Keyframes ─── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* ─── Mobile ─── */
+    @media (max-width: 680px) {
+      body { font-size: 16px; }
+
+      .timeline-track { padding: 0 20px 0 48px; }
+      .timeline-track::before { left: 16px; }
+
+      .event {
+        display: block;
+        padding-left: 36px;
+        margin-bottom: 48px;
+      }
+
+      .event-dot {
+        position: absolute;
+        left: -27px;
+        top: 18px;
+        padding: 0;
+      }
+
+      .event:nth-child(odd) .event-card,
+      .event:nth-child(even) .event-card {
+        grid-column: unset;
+        text-align: left;
+        padding: 22px 24px !important;
+      }
+
+      .event-spacer { display: none; }
+
+      .container { padding: 0 20px; }
+    }
+
+    @media (max-width: 400px) {
+      .hero-title { font-size: 2.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Custom cursor -->
+  <div id="cursor"></div>
+  <div id="cursor-ring"></div>
+
+  <!-- Fixed starfield canvas -->
+  <canvas id="starfield"></canvas>
+  <div class="nebula"></div>
+
+  <!-- ═══════════════════════════════════ HERO ══ -->
+  <section id="hero">
+    <p class="hero-eyebrow">An Inner Atlas</p>
+    <h1 class="hero-title">A Map of<br>the <em>Unseen</em></h1>
+    <p class="hero-subtitle">
+      This is not everything about me.<br>
+      But it is part of why I see the world the way I do.
+    </p>
+    <div class="hero-line"></div>
+    <p class="hero-scroll-label">Scroll to begin</p>
+  </section>
+
+  <!-- ════════════════════════════════════ INTRO ══ -->
+  <section id="intro">
+    <div class="container">
+      <div class="intro-rule reveal"></div>
+      <div class="intro-text">
+        <p class="reveal reveal-delay-1">
+          Some people move through life collecting experiences that fit neatly inside what they already believe.
+          I have had a different kind of life.
+        </p>
+        <p class="reveal reveal-delay-2">
+          Not dramatic. Not chosen. Just strange in ways that left marks.
+        </p>
+        <p class="reveal reveal-delay-3">
+          Over the years, a series of moments — quiet, overwhelming, terrifying, beautiful — pushed me
+          past the edges of ordinary explanation. I did not go looking for most of them. But each one
+          asked something of me: to stay <em>curious</em>, to resist easy answers, to hold the feeling
+          of not knowing and remain present in it anyway.
+        </p>
+        <p class="reveal reveal-delay-4">
+          This is a record of those moments. Not proof of anything.
+          Just the shape of how I got here.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════ TIMELINE ══ -->
+  <section id="timeline">
+    <div class="container">
+      <div class="section-label reveal">Formative Experiences · 2008 – 2022</div>
+    </div>
+    <div class="timeline-track" id="timeline-track">
+      <!-- Events rendered by JS -->
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════ CLOSING ══ -->
+  <section id="closing">
+    <div class="container">
+      <div class="section-label reveal">A Reflection</div>
+      <div class="closing-quote">
+        <p class="reveal reveal-delay-1">
+          These experiences did not make me certain of anything.
+          If anything, they made me less certain —
+          and more at peace with that.
+        </p>
+        <p class="reveal reveal-delay-2">
+          I am not someone who walks around waiting for the next sign.
+          I live an ordinary life most of the time.
+          I make coffee. I watch the sky change. I laugh easily.
+          But underneath all of that, there is a layer of the world I cannot unsee —
+          a dimension of experience that feels older and stranger
+          and more <em>interested in us</em> than we tend to assume.
+        </p>
+        <p class="reveal reveal-delay-3">
+          I am not trying to convince you of anything.
+          I just thought you should know this about me.
+          Because it shapes everything: how I listen, how I love,
+          what I am drawn to, and how I show up
+          when things get quietly strange.
+        </p>
+      </div>
+      <span class="closing-sigil reveal">✦ ◎ ✦</span>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════ RESONANCE ══ -->
+  <section id="resonance">
+    <div class="container">
+      <div class="section-label reveal">Who This Resonates With</div>
+      <h2 class="resonance-heading reveal reveal-delay-1">
+        The person who finds the<br>unknown <em>interesting</em>.
+      </h2>
+      <div class="resonance-text">
+        <p class="reveal reveal-delay-2">
+          I do not need someone who has had the same experiences.
+          I need someone who can <strong>hold mystery without collapsing it</strong> —
+          who can sit with a strange feeling and let it be strange.
+        </p>
+        <p class="reveal reveal-delay-3">
+          Someone emotionally deep enough to go somewhere real in a conversation.
+          Curious enough to wonder what they do not yet know about themselves.
+          Comfortable with the fact that <em>not everything is explainable</em>,
+          and that this is not a problem to be solved.
+        </p>
+        <p class="reveal reveal-delay-4">
+          If any of this felt familiar — or even just intriguing —
+          I suspect we would have something worth exploring.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>Written in presence · Read with curiosity</p>
+  </footer>
+
+  <script>
+  // ══════════════════════ TIMELINE DATA ══════════════════════
+  const events = [
+    {
+      year: "2008",
+      symbol: "◎",
+      title: "The Radio Answered",
+      summary: "A mushroom trip with a close friend turned into something stranger than either of us expected. The radio began echoing our words in real time. I scrolled through twenty channels trying to disprove it. The last station said: <em>believe it</em>.",
+      reflection: "I stepped out of the car and stood in the dark for a long time. Not afraid, exactly — just changed. It was the first time I encountered something I could not rationalize away, and I noticed what that felt like: not terror, but a door creaking open somewhere inside me.",
+      mood: "Strange & Quiet"
+    },
+    {
+      year: "2009",
+      symbol: "⟁",
+      title: "First Extraction",
+      summary: "A friend introduced me to DMT in a quiet northern town. What I encountered in those few minutes did not feel like a hallucination. It felt like a location.",
+      reflection: "That distinction became important to me over time — the difference between distortion and transmission. I did not know what I was receiving. But something seemed to be trying to send it.",
+      mood: "Vast & Still"
+    },
+    {
+      year: "2010",
+      symbol: "✦",
+      title: "Things in the Sky",
+      summary: "Mushrooms became a more regular practice. Strange coincidences began accumulating — small ones at first. Then lights in the sky, appearing too deliberately to dismiss.",
+      reflection: "I started paying attention differently. Not obsessively, but with a kind of soft alertness — the way you listen at night when you are not sure whether you heard something or imagined it.",
+      mood: "Alert & Open"
+    },
+    {
+      year: "2012",
+      symbol: "◉",
+      title: "The Opening",
+      summary: "A UFO encounter left me in genuine shock. The next morning, something in my perception shifted permanently. For two weeks, it felt like a switch had been thrown — a constant hum, waking and sleeping. Each night I would leave my body.",
+      reflection: "I saw orbs circling my sleeping form. I watched myself rest from somewhere nearby. I was not frightened so much as overwhelmed. Something had been turned on and I had no idea how to turn it off. It passed slowly, like a tide going out.",
+      mood: "Overwhelmed & Altered"
+    },
+    {
+      year: "2015",
+      symbol: "∿",
+      title: "Dissolving",
+      summary: "Shambhala opened something unexpected. Later, floating in a sensory deprivation tank in a friend's basement — no light, no sound, no surface — I left my body in a controlled setting for the first time.",
+      reflection: "There is a kind of quiet that exists beyond noise, and a kind of darkness that is not empty. The tank taught me that. When there is nothing to perceive, something remains — something that watches. That was the beginning of understanding consciousness as a thing apart from the body.",
+      mood: "Boundless & Formless"
+    },
+    {
+      year: "2017",
+      symbol: "△",
+      title: "The Night Colin Stopped Breathing",
+      summary: "A summer trip turned frightening when a close friend lost consciousness. For terrible minutes I feared the worst. He came back. That same night, a fleet of lights appeared above us — and something inside me whispered to look up.",
+      reflection: "I still do not know what the connection was, or if there was one. But the sequence felt deliberate. A moment of almost losing something — followed immediately by something vast and indifferent appearing overhead. It rearranged my sense of scale.",
+      mood: "Fear & Awe"
+    },
+    {
+      year: "2018",
+      symbol: "◇",
+      title: "The Breath",
+      summary: "DMT at Shambhala. Then, later that year, I enrolled in a formal breathwork course — searching for a sober path into the same territory.",
+      reflection: "I was learning that the doorways were not the substances. They were states. The breath could take you there too, if you were willing to stop controlling it.",
+      mood: "Seeking & Intentional"
+    },
+    {
+      year: "2019",
+      symbol: "○",
+      title: "Caught on Camera",
+      summary: "Multiple sightings that year — one captured in photographs, on a tripod, at night. Then a near-death out-of-body experience that left me genuinely shaken. The integration took weeks.",
+      reflection: "I felt myself separate from my body — not as a spiritual metaphor, but as a physical sensation of departure. I came back quieter. Some part of what I thought was permanent turned out to be provisional.",
+      mood: "Fractured & Returning"
+    },
+    {
+      year: "2020",
+      symbol: "≋",
+      title: "What We Both Saw",
+      summary: "During a shared experience with a student, we witnessed the same visual phenomenon simultaneously. No prompting, no suggestion between us. Something shifted in the space between us.",
+      reflection: "Shared experience changes things. It means you cannot fully reduce it to your own mind. Whatever it was — it was witnessed by more than one person, independently, at the same moment. That matters to me.",
+      mood: "Witnessed & Confirmed"
+    },
+    {
+      year: "2021",
+      symbol: "⁂",
+      title: "The Jesters",
+      summary: "A DMT session in a tent at a gathering. Two jester-like entities appeared — distinct, vividly present, watching. I spent five minutes trying to understand what I was looking at.",
+      reflection: "They were not threatening. They were also not comforting. They were simply there — watching with what I can only describe as amusement. I emerged unsure whether I had looked into something real or something deep inside myself. I have since come to suspect the distinction is smaller than I thought.",
+      mood: "Curious & Uncertain"
+    },
+    {
+      year: "2022",
+      symbol: "▽",
+      title: "The Shape on the Street",
+      summary: "A craft moved slowly down my street — not clearly visible, but its edge created a distortion field in the air, a visible ripple against the tree line. Two trees tall. Moving with quiet intention.",
+      reflection: "This one unsettled me differently. The others felt curious, inviting, even wondrous. This one felt — observed. I went inside. I do not know what it wanted, if it wanted anything. But I know what I saw. And I have not forgotten the feeling.",
+      mood: "Watched & Unsettled"
+    }
+  ];
+
+  // ══════════════════════ RENDER TIMELINE ══════════════════════
+  function renderTimeline() {
+    const track = document.getElementById('timeline-track');
+
+    events.forEach((ev, i) => {
+      const isOdd = i % 2 === 0;
+
+      const eventEl = document.createElement('div');
+      eventEl.className = 'event reveal';
+      eventEl.style.transitionDelay = '0.05s';
+
+      const cardHTML = `
+        <div class="event-card" data-index="${i}">
+          <span class="event-year">${ev.year}</span>
+          <span class="event-symbol">${ev.symbol}</span>
+          <h3 class="event-title">${ev.title}</h3>
+          <p class="event-summary">${ev.summary}</p>
+          <span class="event-mood">${ev.mood}</span>
+          <div class="event-reflection">
+            <div class="event-reflection-inner">${ev.reflection}</div>
+          </div>
+          <span class="expand-hint">↓ reflect deeper</span>
+        </div>
+      `;
+
+      const spacerHTML = `<div class="event-spacer"></div>`;
+      const dotHTML = `<div class="event-dot"><span></span></div>`;
+
+      eventEl.innerHTML = isOdd
+        ? cardHTML + dotHTML + spacerHTML
+        : spacerHTML + dotHTML + cardHTML;
+
+      track.appendChild(eventEl);
+    });
+
+    // Click to expand
+    document.querySelectorAll('.event-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const isOpen = card.classList.contains('open');
+        // Close any open cards
+        document.querySelectorAll('.event-card.open').forEach(c => {
+          c.classList.remove('open');
+          c.querySelector('.expand-hint').textContent = '↓ reflect deeper';
+        });
+        if (!isOpen) {
+          card.classList.add('open');
+          card.querySelector('.expand-hint').textContent = '↑ close';
+        }
+      });
+    });
+  }
+
+  // ══════════════════════ STARFIELD ══════════════════════
+  function initStarfield() {
+    const canvas = document.getElementById('starfield');
+    const ctx = canvas.getContext('2d');
+
+    let W, H, stars = [];
+
+    function resize() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+
+    function buildStars() {
+      stars = [];
+      const count = Math.floor((W * H) / 4800);
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x:      Math.random() * W,
+          y:      Math.random() * H,
+          r:      Math.random() * 1.3 + 0.15,
+          base:   Math.random() * 0.65 + 0.1,
+          speed:  Math.random() * 0.018 + 0.004,
+          phase:  Math.random() * Math.PI * 2,
+          drift:  (Math.random() - 0.5) * 0.06
+        });
+      }
+    }
+
+    function draw(t) {
+      ctx.clearRect(0, 0, W, H);
+      stars.forEach(s => {
+        s.phase += s.speed;
+        s.x += s.drift;
+        if (s.x < 0) s.x = W;
+        if (s.x > W) s.x = 0;
+
+        const op = s.base * (0.55 + 0.45 * Math.sin(s.phase));
+        const hue = Math.sin(s.phase * 0.3) > 0 ? '220,205,178' : '180,218,228';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${hue},${op.toFixed(3)})`;
+        ctx.fill();
+      });
+      requestAnimationFrame(draw);
+    }
+
+    resize();
+    buildStars();
+    requestAnimationFrame(draw);
+
+    window.addEventListener('resize', () => {
+      resize();
+      buildStars();
+    });
+  }
+
+  // ══════════════════════ SCROLL REVEAL ══════════════════════
+  function initReveal() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  }
+
+  // ══════════════════════ CURSOR ══════════════════════
+  function initCursor() {
+    const cursor     = document.getElementById('cursor');
+    const cursorRing = document.getElementById('cursor-ring');
+    let mx = -100, my = -100;
+    let rx = -100, ry = -100;
+
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX;
+      my = e.clientY;
+      cursor.style.left = mx + 'px';
+      cursor.style.top  = my + 'px';
+    });
+
+    function animateRing() {
+      rx += (mx - rx) * 0.14;
+      ry += (my - ry) * 0.14;
+      cursorRing.style.left = rx + 'px';
+      cursorRing.style.top  = ry + 'px';
+      requestAnimationFrame(animateRing);
+    }
+    animateRing();
+
+    // Grow on hover over interactive elements
+    document.querySelectorAll('a, .event-card, button').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        cursor.style.transform = 'translate(-50%,-50%) scale(2.2)';
+        cursorRing.style.transform = 'translate(-50%,-50%) scale(1.6)';
+        cursorRing.style.borderColor = 'rgba(201,170,114,0.6)';
+      });
+      el.addEventListener('mouseleave', () => {
+        cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+        cursorRing.style.transform = 'translate(-50%,-50%) scale(1)';
+        cursorRing.style.borderColor = 'rgba(201,170,114,0.35)';
+      });
+    });
+  }
+
+  // ══════════════════════ HERO PARALLAX ══════════════════════
+  function initHeroParallax() {
+    const hero = document.getElementById('hero');
+    const title = hero.querySelector('.hero-title');
+    const subtitle = hero.querySelector('.hero-subtitle');
+
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      if (y < window.innerHeight * 1.2) {
+        title.style.transform    = `translateY(${y * 0.18}px)`;
+        subtitle.style.transform = `translateY(${y * 0.10}px)`;
+        hero.style.opacity = 1 - (y / (window.innerHeight * 0.8));
+      }
+    }, { passive: true });
+  }
+
+  // ══════════════════════ BOOT ══════════════════════
+  document.addEventListener('DOMContentLoaded', () => {
+    renderTimeline();
+    initStarfield();
+    // Slight delay before enabling reveal so hero animation plays first
+    setTimeout(initReveal, 600);
+    initCursor();
+    initHeroParallax();
+  });
+  </script>
+</body>
+</html>
