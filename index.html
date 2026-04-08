@@ -72,6 +72,10 @@
       transform: translate(-50%, -50%);
       transition: all 0.18s ease;
     }
+    @media (hover: none), (pointer: coarse) {
+      #cursor, #cursor-ring { display: none; }
+      body { cursor: auto; }
+    }
 
     /* ─── Starfield Canvas ─── */
     #starfield {
